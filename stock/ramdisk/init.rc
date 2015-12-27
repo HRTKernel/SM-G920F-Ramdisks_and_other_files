@@ -1,13 +1,6 @@
 import /init.recovery.${ro.hardware}.rc
 
 on early-init
-    # Apply strict SELinux checking of PROT_EXEC on mmap/mprotect calls.
-    write /sys/fs/selinux/checkreqprot 0
-
-    # Set the security context for the init process.
-    # This should occur before anything else (e.g. ueventd) is started.
-    setcon u:r:init:s0
-
     start ueventd
     start healthd
 
@@ -16,11 +9,10 @@ on init
     export ANDROID_ROOT /system
     export ANDROID_DATA /data
     export EXTERNAL_STORAGE /sdcard
-##++ Security R&D Group
-    export LD_LIBRARY_PATH /system/lib64:/system/vendor/lib:/system/lib
-# Make param link
-    symlink /dev/block/mmcblk0p8 /dev/block/param
-##-- Security R&D Group
+
+## MDFPP START
+    export LD_LIBRARY_PATH /system/vendor/lib64:/system/lib64:/system/vendor/lib:/system/lib
+## MDFPP END
 
     symlink /system/etc /etc
 
@@ -38,6 +30,8 @@ on init
     mkdir /cpefs
     mkdir /tmp
     mkdir /carrier
+    mkdir /persdata
+    mkdir /firmware
     mount tmpfs tmpfs /tmp
 
     chown root shell /tmp
@@ -46,7 +40,6 @@ on init
     write /proc/sys/kernel/panic_on_oops 1
     write /proc/sys/vm/max_map_count 1000000
 
-    emmc_quickverify
 
 on fs
     #mkdir /dev/usb-ffs 0770 shell shell
@@ -66,20 +59,13 @@ on boot
     ifup lo
     hostname localhost
     domainname localdomain
-##++ Security R&D Group
-# mobicore
-    chmod 0700 /dev/mobicore
-    chmod 0666 /dev/mobicore-user
-    chown system system /dev/mobicore
-    chown radio system /dev/mobicore-user
-##-- Security R&D Group
+
     class_start default
 
 # Load properties from /system/ + /factory after fs mount.
 on load_all_props_action
     load_all_props
 
-# Indicate to fw loaders that the relevant mounts are up.
 on firmware_mounts_complete
    rm /dev/.booting
 
@@ -100,7 +86,6 @@ on late-init
 
     trigger early-boot
     trigger boot
-
 
 on property:sys.powerctl=*
    powerctl ${sys.powerctl}
@@ -133,8 +118,27 @@ service kap_disable /sbin/knox_changer -d
     disabled
     oneshot
 
-service static_mc /sbin/mcDriverDaemon_static -r /mcRegistry/ffffffffd0000000000000000000000a.tlbin
+service afw_enable /sbin/knox_changer -f
+    seclabel u:r:kapd:s0
+    class main
+    disabled
+    oneshot
+
+service afw_disable /sbin/knox_changer -s
+    seclabel u:r:kapd:s0
+    class main
+    disabled
+    oneshot
+
+#DMV
+##mobicore daemon - S.LSI case 
+service static_mc /sbin/mcDriverDaemon_static -p /mcRegistry -r /mcRegistry/ffffffffd0000000000000000000000a.tlbin
     seclabel u:r:mobicoredaemon:s0
+    class load_dmv
+
+##qseecomfs daemon - Qualcomm case 
+service static_qsee /sbin/qseecomfsd
+    seclabel u:r:qseecomd:s0
     class load_dmv
 
 on property:security.dmv=start
@@ -142,23 +146,7 @@ on property:security.dmv=start
 
 on property:security.dmv=stop
    class_reset load_dmv
-
-##++ Security R&D Group
-# MobiCore startup
-service mobicore /system/bin/mcDriverDaemon -r /system/app/FFFFFFFF000000000000000000000001.drbin -r /system/app/mcRegistry/ffffffffd00000000000000000000016.tlbin
-    class load_ode_env
-    user system
-    group system
-    oneshot
-
-on property:security.recovery=trigger_start_odeenv
-   class_start load_ode_env
-   setprop security.recovery running_ode
-
-on property:security.recovery=trigger_shutdown_allenv
-   class_reset load_ode_env
-   setprop security.recovery shutdown_all
-##-- Security R&D Group
+#
 
 # Always start adbd on userdebug and eng builds
 on property:ro.debuggable=1
@@ -176,3 +164,9 @@ on property:security.knox_kap_mode=true
     start kap_enable
 on property:security.knox_kap_mode=false
     start kap_disable
+
+# Allow the AFW mode to be set from recovery
+on property:security.knox_afw_mode=true
+    start afw_enable
+on property:security.knox_afw_mode=false
+    start afw_disable

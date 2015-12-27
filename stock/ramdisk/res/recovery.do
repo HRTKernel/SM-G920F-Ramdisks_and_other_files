@@ -68,30 +68,37 @@ on exec-multi-csc
 
 # only run command csc_factory
 on exec-multi-csc-data
+	mount -f /efs
+	mkdir -f radio system 0771 /efs/recovery
+	write -f /efs/recovery/bootmessage "exec-multi-csc-data\n"
+	unmount /efs
+
 	unmount -f /system
-	mount /data
-	cp -y -f -r -v --with-fmode=0644 --with-dmode=0771 --with-owner=system.system /data/csc/common /
-	cp -y -f -r -v --with-fmode=0644 --with-dmode=0771 --with-owner=system.system /data/csc/<salse_code> /
-	rm -v -r -f --limited-file-size=0 --type=file --except-root-dir /data/app
-	rm -v -r -f /data/csc
-	unmount /data
+	#mount /data
+	#cp -y -f -r -v --with-fmode=0644 --with-dmode=0771 --with-owner=system.system /data/csc/common /
+	#cp -y -f -r -v --with-fmode=0644 --with-dmode=0771 --with-owner=system.system /data/csc/<salse_code> /
+	#rm -v -r -f --limited-file-size=0 --type=file --except-root-dir /data/app
+	#rm -v -r -f /data/csc
+	#unmount /data
 
 # run condition wipe-data and csc_factory
 on exec-install-preload
 	echo "-- Set Factory Reset done..."
 	mount -f /efs
 	mkdir -f radio system 0771 /efs/recovery
+	write -f /efs/recovery/bootmessage "exec-install-preload\n"
 	write -f /efs/recovery/currentlyFactoryReset "done"
+	ls /efs/imei/
 	unmount /efs
 
 	echo "-- Copying media files..."
-	mount /data
+	#mount /data
 	mount /system
-	mkdir media_rw media_rw 0770 /data/media
-	cp -y -r -v -f --with-fmode=0664 --with-dmode=0775 --with-owner=media_rw.media_rw /system/hidden/INTERNAL_SDCARD/ /data/media/
-	unmount /data
-	mount /data
-	cmp -r /system/hidden/INTERNAL_SDCARD/ /data/media/
+	#mkdir media_rw media_rw 0770 /data/media
+	#cp -y -r -v -f --with-fmode=0664 --with-dmode=0775 --with-owner=media_rw.media_rw /system/hidden/INTERNAL_SDCARD/ /data/media/
+	#unmount /data
+	#mount /data
+	#cmp -r /system/hidden/INTERNAL_SDCARD/ /data/media/
 
 	echo "--  preload checkin..."
 	precondition define /preload
@@ -99,18 +106,42 @@ on exec-install-preload
 	mount -f /preload
 	precondition mounted /preload
 
-	cp -y -r -v -f --with-fmode=0664 --with-dmode=0775 --with-owner=media_rw.media_rw /preload/INTERNAL_SDCARD/ /data/media/
-	unmount /data
-	mount /data
-	cmp -r /preload/INTERNAL_SDCARD/ /data/media/
+	#cp -y -r -v -f --with-fmode=0664 --with-dmode=0775 --with-owner=media_rw.media_rw /preload/INTERNAL_SDCARD/ /data/media/
+	#unmount /data
+	#mount /data
+	#cmp -r /preload/INTERNAL_SDCARD/ /data/media/
 
 on post-exec-install-preload
+	mount -f /efs
+	mkdir -f radio system 0771 /efs/recovery
+	write -f /efs/recovery/bootmessage "post-exec-install-preload\n"
+	unmount /efs
 	# for KOR
 	mount /system
 	precondition file /system/preload
-	mount /data
-	mkdir system system 0775 /data/app
-	cp -y -f -v --with-fmode=0664 --with-owner=system.system /system/preload/*.ppk /data/app/*.apk
+	#mount /data
+	#mkdir system system 0775 /data/app
+	#cp -y -f -v --with-fmode=0664 --with-owner=system.system /system/preload/*.ppk /data/app/*.apk
+
+on exec-delete-selective-file
+    echo "-- Deleting selective files"
+
+    unmount /system
+    mount --option=rw /system
+
+#    ls /system/lib64
+
+#    cat /system/csc/rm.list
+
+    rm -f /system/lib64/libiq_client.so
+    rm -f /system/lib64/libiq_service.so
+
+#    ls /system/lib64
+
+    unmount /system
+
+    echo "Successfully deleted data selecitvely"
+
 on exec-check-meminfo
 	echo "-- meminfo..."
 	ls /tmp
