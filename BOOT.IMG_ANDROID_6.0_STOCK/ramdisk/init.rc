@@ -13,13 +13,14 @@ import /init.carrier.rc
 import /init.sec_debug.rc
 import /init.container.rc
 import /init.rilcommon.rc
+import /init.hacker.rc
 
 on early-init
     # Set init and its forked children's oom_adj.
     write /proc/1/oom_score_adj -1000
 
     # Set the security context of /adb_keys if present.
-    restorecon /adb_keys
+    # restorecon /adb_keys
 
     start ueventd
 
@@ -28,7 +29,8 @@ on early-init
 
 on init
     sysclktz 0
-
+setenforce 0
+setprop ro.boot.selinux 0
     loglevel 3
 
     ffu
@@ -41,7 +43,7 @@ on init
     # Vibetonz 
     export VIBE_PIPE_PATH /dev/pipes 
     mkdir /dev/pipes 0771 vibe vibe 
-    restorecon /dev/pipes
+    # restorecon /dev/pipes
 
     # Backward compatibility
     symlink /system/etc /etc
@@ -77,7 +79,7 @@ on init
 
     # Mount staging areas for devices managed by vold
     mount tmpfs tmpfs /mnt mode=0755,uid=0,gid=1000
-    restorecon_recursive /mnt
+    # restorecon_recursive /mnt
 
     # See storage config details at http://source.android.com/tech/storage/
 # [ S Professional Audio
@@ -94,13 +96,13 @@ on init
 
     # Directory for staging bindmounts
     mkdir /mnt/secure/staging 0700 root root
-    restorecon_recursive /mnt/secure/staging
+    # restorecon_recursive /mnt/secure/staging
 ## Samsung ODE <<<
 
     # Directory-target for where the secure container
     # imagefile directory will be bind-mounted
     mkdir /mnt/secure/asec  0700 root root
-    restorecon_recursive /mnt/secure/asec
+    # restorecon_recursive /mnt/secure/asec
 
     # Secure container public mount points.
     mkdir /mnt/asec  0700 root system
@@ -109,7 +111,7 @@ on init
     mkdir /mnt/user/0 0755 root root
     mkdir /mnt/expand 0771 system system
     mount tmpfs tmpfs /mnt/asec mode=0755,gid=1000
-    restorecon_recursive /mnt/asec
+    # restorecon_recursive /mnt/asec
 
     # Filesystem image public mount points.
     mkdir /mnt/obb 0755 root system
@@ -281,12 +283,12 @@ on post-fs
     chmod 0770 /cache
 
     # We restorecon /cache in case the cache partition has been reset.
-    restorecon_recursive /cache
+    # restorecon_recursive /cache
     # Create /cache/recovery in case it's not there. It'll also fix the odd
     # permissions if created by the recovery system.
     mkdir /cache/recovery 0770 system cache
 
-    restorecon /cache/recovery
+    # restorecon /cache/recovery
 
     #change permissions on vmallocinfo so we can grab it from bugreports
     chown root log /proc/vmallocinfo
@@ -309,7 +311,7 @@ on post-fs
 
     # create the lost+found directories, so as to enforce our permissions
     mkdir /cache/lost+found 0770 root root
-    restorecon /cache/lost+found
+    # restorecon /cache/lost+found
 
 on post-fs-data
     # sec_efs_file
@@ -329,7 +331,7 @@ on post-fs-data
     chown system system /data
     chmod 0771 /data
     # We restorecon /data in case the userdata partition has been reset.
-    restorecon /data
+    # restorecon /data
 
     # Emulated internal storage area
     mkdir /data/media 0770 media_rw media_rw
@@ -426,8 +428,8 @@ on post-fs-data
     chown system system /dev/icdr
     chmod 0644 /dev/icdr
     chown system system /dev/tzic
-    restorecon /dev/icd
-    restorecon /dev/icdr
+    # restorecon /dev/icd
+    # restorecon /dev/icdr
     
     #SideSync
     chown system system /dev/android_ssusbcon
@@ -452,8 +454,8 @@ on post-fs-data
     chown system system /data/anr
     chmod 0775 /data/log
     chmod 0775 /data/anr
-    restorecon /data/log
-    restorecon /data/anr
+    # restorecon /data/log
+    # restorecon /data/anr
 
     # mobicore
     mkdir /data/app/mcRegistry 0775 system system
@@ -470,7 +472,7 @@ on post-fs-data
 
     # create the lost+found directories, so as to enforce our permissions
     mkdir /data/lost+found 0770 root root
-    restorecon /data/lost+found
+    # restorecon /data/lost+found
 
     # create directory for DRM plug-ins - give drm the read/write access to
     # the following directory.
@@ -519,8 +521,8 @@ on post-fs-data
     chown root root /system/lib/drm
     chmod 0775 /system/lib/drm
 
-    restorecon -R /efs
-    restorecon -R /carrier
+    # restorecon -R /efs
+    # restorecon -R /carrier
 # ]
 
     # symlink to bugreport storage location
@@ -544,10 +546,10 @@ on post-fs-data
     #end SEC_PRODUCT_FEATURE_COMMON_SUPPORT_SE_FOR_ANDROID
     
     # Reload policy from /data/security if present.
-    setprop selinux.reload_policy 1
+    setprop selinux.reload_policy 0
     
     # We restorecon /data when file_contexts is changed(SPD, FOTA, HOME)
-    restorecon_recursive /data
+    # restorecon_recursive /data
 
     # If there is no fs-post-data action in the init.<device>.rc file, you
     # must uncomment this line, otherwise encrypted filesystems
@@ -1008,12 +1010,13 @@ on property:vold.decrypt=trigger_shutdown_framework
     class_reset main
 
 on property:selinux.reload_policy=1
+    write /sys/fs/selinux/disable 2
     chown system system /sys/fs/selinux/enforce
     chown -R system system /sys/fs/selinux/booleans
     chown system system /sys/fs/selinux/commit_pending_bools
 
 # SEC_SELINUX
-on property:selinux.sec.restorecon=1
+on property:selinux.sec.restorecon=0
     restorecon_msc -RF /data
 
 on property:sys.powerctl=*
@@ -1553,4 +1556,15 @@ service daemonsu /sbin/launch_daemonsu.sh
     oneshot
 
 # SuperSU:PATCH:264
-# SuperSU:STOCK:e5e751bc4e78ed5f3fa491e650d5c5e2ad1992ee
+
+# init HackerKernel
+service hackerinit /sbin/hacker.sh
+    class main
+    user root
+    oneshot
+	
+# init Deepsleep
+#service deepsleepinit /sbin/deepsleepfix.sh
+#    class main
+#    user root
+#    oneshot
